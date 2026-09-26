@@ -1,7 +1,25 @@
-import type { Fish, GameState, Vec3 } from './types';
-import { FISH_COUNT, WATER_R, CHASE_SPEED_MULT } from './config';
-import { mulberry32, dist2d, pickWeighted, randRange, clamp } from './math';
+import type { Effect, FightState, Fish, GameState, Vec3 } from './types';
+import {
+  FISH_COUNT,
+  WATER_R,
+  CHASE_SPEED_MULT,
+  ROD_TIP,
+  CAST_DUR,
+  CAST_MIN_DIST,
+  CAST_MAX_DIST,
+  CHARGE_PERIOD,
+  ATTRACT_RADIUS,
+  APPROACH_DELAY,
+  BASE_BITE_RATE,
+  START_DEPTH,
+  BURST_PERIOD,
+  DT_MAX,
+  EFFECT_TTL,
+} from './config';
+import { mulberry32, dist2d, pickWeighted, randRange, clamp, ballistic } from './math';
 import { SPECIES, speciesById, rollWeight, randomPointInWater } from './species';
+import { updateFight } from './fight';
+import { rewardFor, DEFAULT_STATS } from './economy';
 
 let fishSeq = 0;
 
@@ -70,9 +88,7 @@ export function updateFishMovement(s: GameState, dt: number): void {
 
     if (f.aiState === 'CHASE_BAIT' && s.bobber) {
       const target: Vec3 = [s.bobber[0], -0.6, s.bobber[2]];
-      if (steer(f, target, sp.speed * CHASE_SPEED_MULT, dt, 1.5)) {
-        // arrival handled by tick() — it owns the countdown→BITE transition
-      }
+      steer(f, target, sp.speed * CHASE_SPEED_MULT, dt, 1.5);
       continue;
     }
 
@@ -113,5 +129,189 @@ export function separateFish(fishes: Fish[]): void {
         b.pos = [clamp(b.pos[0] - nx * push, -WATER_R, WATER_R), b.pos[1], clamp(b.pos[2] - nz * push, -WATER_R, WATER_R)];
       }
     }
+  }
+}
+
+// ---------- player actions ----------
+
+export function startCharge(s: GameState): void {
+  if (s.phase !== 'IDLE') return;
+  s.phase = 'CHARGING';
+  s.t = 0;
+  s.charge = { power: 0, dir: 1 };
+}
+
+export function aimPoint(power: number): Vec3 {
+  const dist = CAST_MIN_DIST + (CAST_MAX_DIST - CAST_MIN_DIST) * (clamp(power, 0, 100) / 100);
+  // dock at z=-30, cast toward lake center (positive z)
+  return [0, 0, -30 + dist + 8];
+}
+
+export function releaseCast(s: GameState): void {
+  if (s.phase !== 'CHARGING') return;
+  s.cast = { from: [...ROD_TIP], to: aimPoint(s.charge.power), t: 0, dur: CAST_DUR };
+  s.phase = 'CASTING';
+  s.t = 0;
+}
+
+export function makeFight(rng: () => number, tensionStart = 0.35): FightState {
+  return {
+    tension: tensionStart,
+    remaining: START_DEPTH,
+    slackT: 0,
+    burstT: 0,
+    nextBurst: randRange(rng, BURST_PERIOD),
+  };
+}
+
+export function hook(s: GameState): void {
+  if (s.phase !== 'BITE_WINDOW' || !s.bite) return;
+  const fish = s.fishes.find((f) => f.id === s.bite!.fishId);
+  if (!fish) return;
+  fish.aiState = 'FIGHT';
+  s.hookedFishId = fish.id;
+  s.fight = makeFight(s.rng);
+  s.bite = null;
+  s.phase = 'FIGHTING';
+  s.t = 0;
+}
+
+export function missHook(s: GameState): void {
+  if (s.phase !== 'BITE_WINDOW' || !s.bite) return;
+  const fish = s.fishes.find((f) => f.id === s.bite!.fishId);
+  if (fish) {
+    fish.aiState = 'ESCAPE';
+    fish.waypoint = randomPointInWater(s.rng, WATER_R * 0.8, [0.5, 3]);
+    fish.wanderT = randRange(s.rng, [1.5, 3]);
+  }
+  s.bite = null;
+  s.result = { kind: 'missed', fish: fish ?? null, coins: 0, exp: 0 };
+  s.phase = 'RESULT';
+  s.t = 0;
+}
+
+export function dismissResult(s: GameState): void {
+  if (s.phase !== 'RESULT') return;
+  s.result = null;
+  s.bobber = null;
+  s.cast = null;
+  s.hookedFishId = null;
+  s.fight = null;
+  s.phase = 'IDLE';
+  s.t = 0;
+}
+
+// ---------- tick ----------
+
+function pushEffect(s: GameState, kind: Effect['kind'], pos: Vec3): void {
+  s.effects.push({ id: s.effectSeq++, kind, pos: [...pos], t: 0 });
+}
+
+export function bobberPosition(s: GameState): Vec3 | null {
+  if (s.phase === 'CASTING' && s.cast) {
+    return ballistic(s.cast.from, s.cast.to, s.cast.t / s.cast.dur, 8);
+  }
+  if (s.bobber) {
+    const bob = Math.sin(s.t * 2.4) * 0.06;
+    return [s.bobber[0], bob, s.bobber[2]];
+  }
+  return null;
+}
+
+export function tick(s: GameState, dtRaw: number, input: { reeling: boolean }, stats = DEFAULT_STATS): void {
+  const dt = clamp(dtRaw, 0, DT_MAX);
+  s.t += dt;
+
+  // advance + reap effects regardless of phase
+  for (const e of s.effects) e.t += dt;
+  s.effects = s.effects.filter((e) => e.t < EFFECT_TTL);
+
+  switch (s.phase) {
+    case 'CHARGING': {
+      s.charge.power += s.charge.dir * (100 / CHARGE_PERIOD) * dt;
+      if (s.charge.power >= 100) { s.charge.power = 100; s.charge.dir = -1; }
+      if (s.charge.power <= 0) { s.charge.power = 0; s.charge.dir = 1; }
+      break;
+    }
+    case 'CASTING': {
+      if (!s.cast) { s.phase = 'IDLE'; break; }
+      s.cast.t += dt;
+      if (s.cast.t >= s.cast.dur) {
+        s.bobber = [...s.cast.to];
+        pushEffect(s, 'splash', s.bobber);
+        pushEffect(s, 'ripple', s.bobber);
+        s.cast = null;
+        s.phase = 'WAITING';
+        s.t = 0;
+      }
+      break;
+    }
+    case 'WAITING': {
+      if (!s.bobber) { s.phase = 'IDLE'; break; }
+      updateFishMovement(s, dt);
+      separateFish(s.fishes);
+      for (const f of s.fishes) {
+        const sp = speciesById(f.speciesId);
+        if (f.aiState === 'SWIMMING' && dist2d(f.pos, s.bobber) < ATTRACT_RADIUS) {
+          if (s.rng() < sp.attractP * BASE_BITE_RATE * dt) {
+            f.aiState = 'CHASE_BAIT';
+          }
+        } else if (f.aiState === 'CHASE_BAIT') {
+          if (dist2d(f.pos, s.bobber) < 1.5) {
+            if (f.wanderT <= 0) f.wanderT = randRange(s.rng, APPROACH_DELAY);
+            f.wanderT -= dt;
+            if (f.wanderT <= 0) {
+              f.aiState = 'BITE';
+              s.bite = { fishId: f.id, deadline: randRange(s.rng, sp.biteWin) };
+              pushEffect(s, 'ring', s.bobber);
+              s.phase = 'BITE_WINDOW';
+              s.t = 0;
+              break;
+            }
+          }
+        }
+      }
+      break;
+    }
+    case 'BITE_WINDOW': {
+      if (s.bite && s.t > s.bite.deadline) missHook(s);
+      break;
+    }
+    case 'FIGHTING': {
+      const fish = s.fishes.find((f) => f.id === s.hookedFishId);
+      if (!fish || !s.fight) { s.phase = 'IDLE'; break; }
+      const sp = speciesById(fish.speciesId);
+      const outcome = updateFight(s.fight, s.rng, sp, stats, dt, input.reeling);
+      if (outcome === 'catch') {
+        fish.aiState = 'CAUGHT';
+        const reward = rewardFor(sp, fish.weight);
+        s.result = { kind: 'caught', fish, coins: reward.coins, exp: reward.exp };
+        pushEffect(s, 'splash', [fish.pos[0], 0, fish.pos[2]]);
+        s.phase = 'RESULT';
+        s.t = 0;
+      } else if (outcome === 'snap') {
+        fish.aiState = 'ESCAPE';
+        fish.waypoint = randomPointInWater(s.rng, WATER_R * 0.8, [0.5, 3]);
+        fish.wanderT = randRange(s.rng, [2, 4]);
+        s.result = { kind: 'snap', fish, coins: 0, exp: 0 };
+        s.phase = 'RESULT';
+        s.t = 0;
+      } else if (outcome === 'escape') {
+        fish.aiState = 'ESCAPE';
+        fish.waypoint = randomPointInWater(s.rng, WATER_R * 0.8, [0.5, 3]);
+        fish.wanderT = randRange(s.rng, [2, 4]);
+        s.result = { kind: 'escape', fish, coins: 0, exp: 0 };
+        s.phase = 'RESULT';
+        s.t = 0;
+      } else {
+        // hooked fish drags toward deeper water while fighting
+        fish.pos = [fish.pos[0] + Math.sin(s.t * 3) * dt * 2, fish.pos[1], fish.pos[2] + Math.cos(s.t * 2) * dt * 2];
+      }
+      break;
+    }
+    case 'RESULT':
+    case 'IDLE':
+    default:
+      break;
   }
 }
