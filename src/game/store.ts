@@ -16,10 +16,10 @@ export interface StoreState {
   chargeRelease(): void;
   hook(): void;
   setReeling(v: boolean): void;
+  hydrate(loaded?: Profile): void;
   dismissResult(): void;
   buyUpgrade(id: UpgradeId): void;
   buyRod(id: string): void;
-  hydrate(): void;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -35,10 +35,10 @@ export const useGame = create<StoreState>()((set, get) => ({
   reeling: false,
   hydrated: false,
 
-  hydrate() {
+  hydrate(loaded?: Profile) {
     if (get().hydrated) return;
-    const loaded = localAdapter.load() ?? defaultProfile();
-    set({ profile: loaded, stats: computeStats(loaded), hydrated: true });
+    const p = loaded ?? localAdapter.load() ?? defaultProfile();
+    set({ profile: p, stats: computeStats(p), hydrated: true });
   },
 
   tick(dt) {
