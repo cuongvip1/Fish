@@ -3,8 +3,9 @@
 import { useGame } from '../game/store';
 import { speciesById } from '../game/species';
 import { playSfx } from '../audio/manager';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useRef } from 'react';
+import type { CatchResult } from '../game/types';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const RARITY_STYLE: Record<string, { label: string; cls: string }> = {
   common: { label: 'Thường', cls: 'bg-slate-500/70 text-slate-100' },
@@ -16,16 +17,17 @@ const RARITY_STYLE: Record<string, { label: string; cls: string }> = {
 export default function CatchCard() {
   const sim = useGame((s) => s.sim);
   const dismissResult = useGame((s) => s.dismissResult);
-  const played = useRef<number | null>(null);
-
+  // play result SFX exactly once per result object (identity, not sim.t
+  // which increments every tick while the card is open)
+  const playedRef = useRef<CatchResult | null>(null);
   useEffect(() => {
-    if (sim.phase === 'RESULT' && sim.result && played.current !== sim.t) {
-      if (sim.result.kind === 'caught') playSfx('catch');
-      else if (sim.result.kind === 'snap') playSfx('snap');
-      played.current = sim.t;
-    }
-    if (sim.phase !== 'RESULT') played.current = null;
-  }, [sim.phase, sim.result, sim.t]);
+    if (sim.phase !== 'RESULT' || !sim.result) return;
+    if (playedRef.current === sim.result) return;
+    playedRef.current = sim.result;
+    if (sim.result.kind === 'caught') playSfx('catch');
+    else if (sim.result.kind === 'snap') playSfx('snap');
+    else playSfx('splash');
+  }, [sim.phase, sim.result]);
 
   if (sim.phase !== 'RESULT' || !sim.result) return null;
   const r = sim.result;

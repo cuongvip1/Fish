@@ -35,11 +35,6 @@ export default function FishSchool() {
     []
   );
 
-  // static per-instance colors
-  useMemo(() => {
-    // colors assigned lazily in first frame below once mesh exists
-  }, []);
-
   const colored = useRef(false);
 
   useFrame((state) => {
@@ -52,7 +47,6 @@ export default function FishSchool() {
       const hidden = f.aiState === 'CAUGHT';
       const scale = hidden ? 0.0001 : 0.5 + (f.weight / sp.wMax) * 1.1;
       tmpObj.position.set(f.pos[0], f.pos[1], f.pos[2]);
-      // face velocity direction
       if (Math.abs(f.vel[0]) + Math.abs(f.vel[2]) > 0.01) {
         tmpObj.rotation.y = -Math.atan2(f.vel[2], f.vel[0]);
       }

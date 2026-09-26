@@ -86,9 +86,16 @@ export function updateFishMovement(s: GameState, dt: number): void {
     if (f.aiState === 'CAUGHT' || f.aiState === 'FIGHT' || f.aiState === 'BITE') continue;
     const sp = speciesById(f.speciesId);
 
-    if (f.aiState === 'CHASE_BAIT' && s.bobber) {
-      const target: Vec3 = [s.bobber[0], -0.6, s.bobber[2]];
-      steer(f, target, sp.speed * CHASE_SPEED_MULT, dt, 1.5);
+    if (f.aiState === 'CHASE_BAIT') {
+      if (!s.bobber) {
+        // bait gone (missed/snap/escape/dismiss) — back to wandering
+        f.aiState = 'SWIMMING';
+        f.waypoint = randomPointInWater(s.rng, WATER_R * 0.8, [0.5, 3]);
+        f.wanderT = randRange(s.rng, [2, 6]);
+      } else {
+        const target: Vec3 = [s.bobber[0], -0.6, s.bobber[2]];
+        steer(f, target, sp.speed * CHASE_SPEED_MULT, dt, 1.5);
+      }
       continue;
     }
 
@@ -192,6 +199,17 @@ export function missHook(s: GameState): void {
 
 export function dismissResult(s: GameState): void {
   if (s.phase !== 'RESULT') return;
+  // recycle the caught fish so the lake never depletes
+  const caught = s.result?.kind === 'caught' ? s.result.fish : null;
+  if (caught) {
+    const sp = speciesById(caught.speciesId);
+    caught.aiState = 'SWIMMING';
+    caught.pos = randomPointInWater(s.rng, WATER_R * 0.8, [0.5, 3]);
+    caught.waypoint = randomPointInWater(s.rng, WATER_R * 0.8, [0.5, 3]);
+    caught.wanderT = randRange(s.rng, [2, 6]);
+    caught.weight = rollWeight(s.rng, sp);
+    caught.vel = [0, 0, 0];
+  }
   s.result = null;
   s.bobber = null;
   s.cast = null;
@@ -222,6 +240,10 @@ export function tick(s: GameState, dtRaw: number, input: { reeling: boolean }, s
   const dt = clamp(dtRaw, 0, DT_MAX);
   s.t += dt;
 
+  // fish swim continuously regardless of phase (CHASE/FIGHT/BITE/CAUGHT guarded inside)
+  updateFishMovement(s, dt);
+  separateFish(s.fishes);
+
   // advance + reap effects regardless of phase
   for (const e of s.effects) e.t += dt;
   s.effects = s.effects.filter((e) => e.t < EFFECT_TTL);
@@ -248,8 +270,6 @@ export function tick(s: GameState, dtRaw: number, input: { reeling: boolean }, s
     }
     case 'WAITING': {
       if (!s.bobber) { s.phase = 'IDLE'; break; }
-      updateFishMovement(s, dt);
-      separateFish(s.fishes);
       let anyChase = false;
       for (const f of s.fishes) {
         const sp = speciesById(f.speciesId);

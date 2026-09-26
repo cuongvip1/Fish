@@ -74,7 +74,7 @@ export interface GameState {
   charge: { power: number; dir: 1 | -1 };
   cast: CastState | null;
   bobber: Vec3 | null;
-  /** absolute s.t deadline for hooking */
+  /** seconds left to hook (duration, counted against phase-local t) */
   bite: { fishId: number; deadline: number } | null;
   hookedFishId: number | null;
   fight: FightState | null;
@@ -90,6 +90,8 @@ export interface Profile {
   exp: number;
   level: number;
   rodId: string;
+  /** rods the player owns (re-equip is free) */
+  ownedRods: string[];
   upgrades: Record<'strength' | 'line' | 'reel', number>;
   collection: Record<string, { count: number; maxWeight: number }>;
   totalCaught: number;

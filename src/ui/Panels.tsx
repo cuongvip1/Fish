@@ -86,9 +86,10 @@ export default function Panels({
               <div className="space-y-2">
                 <div className="mb-1 text-[11px] font-bold uppercase tracking-widest text-white/50">Cần câu</div>
                 {RODS.map((rod) => {
-                  const owned = profile.rodId === rod.id;
+                  const equipped = profile.rodId === rod.id;
+                  const owned = profile.ownedRods.includes(rod.id);
                   const locked = profile.level < rod.minLevel;
-                  const canBuy = !owned && !locked && profile.coins >= rod.price;
+                  const canBuy = !equipped && !locked && (owned || profile.coins >= rod.price);
                   return (
                     <div
                       key={rod.id}
@@ -96,25 +97,26 @@ export default function Panels({
                     >
                       <div>
                         <div className="text-sm font-bold text-white">
-                          {rod.name} {owned && <span className="text-cyan-300">· đang dùng</span>}
+                          {rod.name} {equipped && <span className="text-cyan-300">· đang dùng</span>}
                         </div>
                         <div className="text-[11px] text-white/50">
                           Lực ×{rod.stats.strength} · Quay ×{rod.stats.reel}
                           {locked && <span className="text-red-300"> · cần Lv {rod.minLevel}</span>}
+                          {!locked && owned && !equipped && <span className="text-cyan-300"> · đã sở hữu</span>}
                         </div>
                       </div>
                       <button
                         disabled={!canBuy}
                         onClick={() => { buyRod(rod.id); playSfx('click'); }}
                         className={`rounded-xl px-3 py-1.5 text-xs font-bold ${
-                          owned
+                          equipped
                             ? 'bg-cyan-600/40 text-cyan-200'
                             : canBuy
                               ? 'bg-amber-500 text-amber-950 hover:bg-amber-400'
                               : 'bg-white/10 text-white/40'
                         }`}
                       >
-                        {owned ? '✓' : `${rod.price} 🪙`}
+                        {equipped ? '✓' : owned ? 'Dùng' : `${rod.price} 🪙`}
                       </button>
                     </div>
                   );

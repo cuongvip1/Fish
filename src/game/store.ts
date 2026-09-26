@@ -52,7 +52,7 @@ export const useGame = create<StoreState>()((set, get) => ({
       persistSoon(p);
       set({ profile: p, stats: computeStats(p) });
     }
-    set({ sim: { ...sim } });
+    set({ sim: { ...sim }, reeling: sim.phase === 'FIGHTING' ? get().reeling : false });
   },
 
   chargeStart() {

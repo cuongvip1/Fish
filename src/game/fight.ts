@@ -32,11 +32,11 @@ export function updateFight(
   const bursting = f.burstT > 0;
   if (bursting) f.burstT -= dt;
 
-  // tension dynamics
+  // tension dynamics — fish push scales against line capacity (tensionMax)
   const reelGain = reeling ? REEL_FORCE : 0;
-  const fishPull = species.power * 0.04 + (bursting ? species.power * BURST_MULT * 0.06 : 0);
+  const capacity = stats.tensionMax / 100; // 1.0 at base rod
+  const fishPull = (species.power * 0.04 + (bursting ? species.power * BURST_MULT * 0.06 : 0)) / capacity;
   f.tension = clamp(f.tension + (reelGain + fishPull - TENSION_DRAIN) * dt, 0, 1.2);
-
   // reel progress only in the green band
   if (f.tension >= stats.greenLo && f.tension <= stats.greenHi) {
     f.remaining -= stats.reelSpeed * 1.4 * dt;

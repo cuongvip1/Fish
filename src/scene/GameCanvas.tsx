@@ -27,7 +27,8 @@ export default function GameCanvas() {
       shadows
       gl={{ antialias: true }}
     >
-      <fog attach="fog" args={['#9fc8d8', 60, 220]} />
+      <color attach="background" args={['#a5cfe0']} />
+      <fog attach="fog" args={['#a5cfe0', 60, 220]} />
       <directionalLight
         position={[40, 50, 20]}
         intensity={1.6}

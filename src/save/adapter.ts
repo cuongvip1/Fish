@@ -8,6 +8,7 @@ export function defaultProfile(): Profile {
     exp: 0,
     level: 1,
     rodId: 'starter',
+    ownedRods: ['starter'],
     upgrades: { strength: 0, line: 0, reel: 0 },
     collection: {},
     totalCaught: 0,
@@ -27,7 +28,8 @@ export const localAdapter: SaveAdapter = {
       if (!raw) return null;
       const parsed = JSON.parse(raw) as Profile;
       // defensive merge so old saves missing new fields still work
-      return { ...defaultProfile(), ...parsed, upgrades: { ...defaultProfile().upgrades, ...parsed.upgrades } };
+      const base = defaultProfile();
+      return { ...base, ...parsed, ownedRods: parsed.ownedRods ?? base.ownedRods, upgrades: { ...base.upgrades, ...parsed.upgrades } };
     } catch {
       return null;
     }

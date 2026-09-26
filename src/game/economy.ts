@@ -135,6 +135,12 @@ export function buyRod(p: Profile, id: string): Profile | null {
   if (!rod) return null;
   if (p.rodId === id) return null;
   if (p.level < rod.minLevel) return null;
-  if (p.coins < rod.price) return null;
-  return { ...p, coins: p.coins - rod.price, rodId: id };
+  const owned = p.ownedRods.includes(id);
+  if (!owned && p.coins < rod.price) return null;
+  return {
+    ...p,
+    coins: owned ? p.coins : p.coins - rod.price,
+    rodId: id,
+    ownedRods: owned ? p.ownedRods : [...p.ownedRods, id],
+  };
 }
