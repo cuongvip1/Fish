@@ -1,0 +1,25 @@
+import type { Vec3 } from './types';
+
+export const WATER_R = 42;
+export const DOCK_POS: Vec3 = [0, 0.4, -30];
+export const ROD_TIP: Vec3 = [0, 3.1, -27.2];
+export const DT_MAX = 0.1;
+export const CHARGE_PERIOD = 1.4;
+export const CAST_MIN_DIST = 6;
+export const CAST_MAX_DIST = 30;
+export const CAST_DUR = 0.9;
+export const CAST_APEX = 8;
+export const FISH_COUNT = 14;
+export const ATTRACT_RADIUS = 9;
+export const CHASE_SPEED_MULT = 2.2;
+export const APPROACH_DELAY: [number, number] = [0.8, 2.2];
+export const SLACK_TIME = 1.5;
+export const REEL_FORCE = 0.55;
+export const TENSION_DRAIN = 0.18;
+export const GREEN_BAND: [number, number] = [0.25, 0.75];
+export const START_DEPTH = 26;
+export const BURST_PERIOD: [number, number] = [1.4, 3.0];
+export const BURST_LEN: [number, number] = [0.5, 1.1];
+export const BURST_MULT = 1.8;
+export const BASE_BITE_RATE = 0.6;
+export const EFFECT_TTL = 1.2;
