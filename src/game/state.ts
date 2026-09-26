@@ -250,13 +250,16 @@ export function tick(s: GameState, dtRaw: number, input: { reeling: boolean }, s
       if (!s.bobber) { s.phase = 'IDLE'; break; }
       updateFishMovement(s, dt);
       separateFish(s.fishes);
+      let anyChase = false;
       for (const f of s.fishes) {
         const sp = speciesById(f.speciesId);
         if (f.aiState === 'SWIMMING' && dist2d(f.pos, s.bobber) < ATTRACT_RADIUS) {
           if (s.rng() < sp.attractP * BASE_BITE_RATE * dt) {
             f.aiState = 'CHASE_BAIT';
+            f.wanderT = 0;
           }
         } else if (f.aiState === 'CHASE_BAIT') {
+          anyChase = true;
           if (dist2d(f.pos, s.bobber) < 1.5) {
             if (f.wanderT <= 0) f.wanderT = randRange(s.rng, APPROACH_DELAY);
             f.wanderT -= dt;
@@ -270,6 +273,17 @@ export function tick(s: GameState, dtRaw: number, input: { reeling: boolean }, s
             }
           }
         }
+      }
+      // casual pacing: after ~3.5s with nobody homing, send the nearest fish
+      if (!anyChase && s.t > 3.5) {
+        let nearest: Fish | null = null;
+        let nd = Infinity;
+        for (const f of s.fishes) {
+          if (f.aiState !== 'SWIMMING') continue;
+          const d = dist2d(f.pos, s.bobber);
+          if (d < nd) { nd = d; nearest = f; }
+        }
+        if (nearest) { nearest.aiState = 'CHASE_BAIT'; nearest.wanderT = 0; }
       }
       break;
     }

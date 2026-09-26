@@ -47,13 +47,11 @@ void main() {
   float bd = length(vPos.xz - uBobber.xz);
   float rip = sin(bd * 6.0 - uTime * 6.0) * exp(-bd * 0.55);
   col += rip * 0.09;
-  gl_FragColor = vec4(col, 0.92);
+  gl_FragColor = vec4(col, 0.78);
 }
 `;
 
 export default function Water() {
-  const matRef = useRef<THREE.ShaderMaterial>(null);
-
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({

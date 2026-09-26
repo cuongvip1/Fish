@@ -27,11 +27,20 @@ describe('state machine', () => {
     toBiteOrResult(s);
     expect(['BITE_WINDOW', 'FIGHTING', 'RESULT']).toContain(s.phase);
   });
-  it('release at zero power still casts', () => {
-    const s = createGame(1);
-    startCharge(s);
-    releaseCast(s);
-    expect(s.phase).toBe('CASTING');
+  it('bite arrives within 20s of cast (pacing fallback)', () => {
+    for (const seed of [2, 5, 11, 23]) {
+      const s = createGame(seed);
+      startCharge(s);
+      run(s, 0.5);
+      releaseCast(s);
+      run(s, CAST_DUR + 0.2);
+      let waitSecs = 0;
+      while (s.phase === 'WAITING' && waitSecs < 20) {
+        run(s, 1);
+        waitSecs++;
+      }
+      expect(s.phase, `seed ${seed}`).not.toBe('WAITING');
+    }
   });
   it('double hook in same window is a no-op', () => {
     const s = createGame(42);

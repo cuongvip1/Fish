@@ -7,10 +7,18 @@ import CastButton from '../ui/CastButton';
 import FightUI from '../ui/FightUI';
 import BitePrompt from '../ui/BitePrompt';
 import CatchCard from '../ui/CatchCard';
-import Providers from '../ui/Providers';
 import { useGame } from '../game/store';
 import { startWaterLoop } from '../audio/manager';
 import { useProfileQuery } from '../save/queries';
+
+// dev-only handle for automated testing
+declare global {
+  interface Window { __game?: typeof useGame }
+}
+if (process.env.NODE_ENV !== 'production') {
+  // eslint-disable-next-line react-hooks/globals
+  if (typeof window !== 'undefined') window.__game = useGame;
+}
 
 export default function Game() {
   const hydrate = useGame((s) => s.hydrate);
@@ -28,15 +36,13 @@ export default function Game() {
   }, []);
 
   return (
-    <Providers>
-      <div className="fixed inset-0">
-        <GameCanvas />
-        <HUD />
-        <CastButton />
-        <FightUI />
-        <BitePrompt />
-        <CatchCard />
-      </div>
-    </Providers>
+    <div className="fixed inset-0">
+      <GameCanvas />
+      <HUD />
+      <CastButton />
+      <FightUI />
+      <BitePrompt />
+      <CatchCard />
+    </div>
   );
 }
