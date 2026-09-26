@@ -11,9 +11,9 @@ const SEGMENTS = 14;
 const GRAVITY = -1.8;
 const tmpBob = new THREE.Vector3();
 
+/* eslint-disable react-hooks/immutability -- verlet points/prev are memoized buffers mutated per-frame */
 export default function FishingLine() {
   const { line, points, prev } = useMemo(() => {
-    const pts = Array.from({ length: SEGMENTS + 1 }, () => rodTipRef.clone());
     const geo = new THREE.BufferGeometry();
     const positions = new Float32Array((SEGMENTS + 1) * 3);
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));

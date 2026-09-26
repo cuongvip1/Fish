@@ -2,7 +2,7 @@
 
 import { useGame } from '../game/store';
 import { SPECIES } from '../game/species';
-import { RODS, UPGRADES, upgradeCost, computeStats } from '../game/economy';
+import { RODS, UPGRADES, upgradeCost } from '../game/economy';
 import { playSfx } from '../audio/manager';
 import { motion, AnimatePresence } from 'framer-motion';
 

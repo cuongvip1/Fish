@@ -16,7 +16,6 @@ declare global {
   interface Window { __game?: typeof useGame }
 }
 if (process.env.NODE_ENV !== 'production') {
-  // eslint-disable-next-line react-hooks/globals
   if (typeof window !== 'undefined') window.__game = useGame;
 }
 

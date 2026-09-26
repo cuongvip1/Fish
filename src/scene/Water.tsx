@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { WATER_R } from '../game/config';
@@ -51,6 +51,7 @@ void main() {
 }
 `;
 
+/* eslint-disable react-hooks/immutability -- material is a stable memoized ShaderMaterial mutated per-frame */
 export default function Water() {
   const material = useMemo(
     () =>
